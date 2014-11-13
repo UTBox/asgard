@@ -251,6 +251,8 @@ ${loadBalancerNames}"""
 Group: ${lastGroup.loadBalancerNames}"""
             boolean ebsOptimized = params.containsKey('ebsOptimized') ? params.ebsOptimized?.toBoolean() :
                 lastLaunchConfig.ebsOptimized
+			boolean associatePublicIPAddress = params.containsKey('associatePublicIpAddress') ? params.associatePublicIpAddress?.toBoolean() :
+                lastLaunchConfig.getAssociatePublicIpAddress()
             if (params.noOptionalDefaults != 'true') {
                 securityGroups = securityGroups ?: lastLaunchConfig.securityGroups
                 termPolicies = termPolicies ?: lastGroup.terminationPolicies
@@ -291,7 +293,8 @@ Group: ${loadBalancerNames}"""
                     scheduledActions: newScheduledActions,
                     vpcZoneIdentifier: vpcZoneIdentifier,
                     spotPrice: spotPrice,
-                    ebsOptimized: ebsOptimized
+                    ebsOptimized: ebsOptimized,
+					associatePublicIpAddress: associatePublicIPAddress
             )
             def operation = pushService.startGroupCreate(options)
             flash.message = "${operation.task.name} has been started."
