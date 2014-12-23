@@ -15,6 +15,13 @@
  */
 package com.netflix.asgard
 
+import grails.converters.JSON
+import grails.converters.XML
+
+import org.joda.time.DateTime
+import org.joda.time.Duration
+import org.springframework.http.HttpStatus
+
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.services.autoscaling.model.Activity
 import com.amazonaws.services.autoscaling.model.AutoScalingGroup
@@ -25,9 +32,15 @@ import com.amazonaws.services.autoscaling.model.ScheduledUpdateGroupAction
 import com.amazonaws.services.autoscaling.model.SuspendedProcess
 import com.amazonaws.services.cloudwatch.model.MetricAlarm
 import com.amazonaws.services.ec2.model.AvailabilityZone
+import com.amazonaws.services.ec2.model.DescribeInstanceStatusRequest
+import com.amazonaws.services.ec2.model.DescribeInstanceStatusResult
 import com.amazonaws.services.ec2.model.GroupIdentifier
 import com.amazonaws.services.ec2.model.Image
+import com.amazonaws.services.ec2.model.InstanceStatus
+import com.amazonaws.services.ec2.model.InstanceStatusDetails
 import com.amazonaws.services.ec2.model.SecurityGroup
+import com.amazonaws.services.ec2.model.StatusType
+import com.amazonaws.services.ec2.model.SummaryStatus
 import com.amazonaws.services.elasticloadbalancing.model.LoadBalancerDescription
 import com.google.common.collect.Multiset
 import com.google.common.collect.Sets
@@ -37,14 +50,11 @@ import com.netflix.asgard.model.AutoScalingGroupHealthCheckType
 import com.netflix.asgard.model.AutoScalingProcessType
 import com.netflix.asgard.model.GroupedInstance
 import com.netflix.asgard.model.InstancePriceType
+import com.netflix.asgard.model.InstanceStateData
 import com.netflix.asgard.model.SubnetTarget
 import com.netflix.asgard.model.Subnets
 import com.netflix.frigga.Names
 import com.netflix.grails.contextParam.ContextParam
-import grails.converters.JSON
-import grails.converters.XML
-import org.joda.time.DateTime
-import org.joda.time.Duration
 
 @ContextParam('region')
 class AutoScalingController {
@@ -558,4 +568,19 @@ class AutoScalingController {
             json { new JSON(groupsWithMissingImages).render(response) }
         }
     }
+
+	def instanceHealthCheck(){
+		UserContext userContext = UserContext.of(request)
+		List<String> instanceIds = params.list('instanceIds')
+		try{
+			if(!awsEc2Service.allInstanceHealthy(userContext, instanceIds)){
+				response.status = HttpStatus.SERVICE_UNAVAILABLE.value
+			}
+		} catch(AmazonServiceException e){
+			response.status = HttpStatus.NOT_FOUND.value
+		}
+		withFormat {
+			json { new JSON([:]).render(response) }
+		}
+	}
 }

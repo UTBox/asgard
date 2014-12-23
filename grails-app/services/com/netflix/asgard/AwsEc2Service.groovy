@@ -15,6 +15,15 @@
  */
 package com.netflix.asgard
 
+import groovyx.gpars.GParsExecutorsPool
+
+import java.util.regex.Matcher
+import java.util.regex.Pattern
+
+import org.apache.commons.codec.binary.Base64
+import org.codehaus.groovy.runtime.StackTraceUtils
+import org.springframework.beans.factory.InitializingBean
+
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.ec2.model.AccountAttribute
@@ -42,6 +51,8 @@ import com.amazonaws.services.ec2.model.DescribeImagesRequest
 import com.amazonaws.services.ec2.model.DescribeImagesResult
 import com.amazonaws.services.ec2.model.DescribeInstanceAttributeRequest
 import com.amazonaws.services.ec2.model.DescribeInstanceAttributeResult
+import com.amazonaws.services.ec2.model.DescribeInstanceStatusRequest
+import com.amazonaws.services.ec2.model.DescribeInstanceStatusResult
 import com.amazonaws.services.ec2.model.DescribeInstancesRequest
 import com.amazonaws.services.ec2.model.DescribeInstancesResult
 import com.amazonaws.services.ec2.model.DescribeKeyPairsRequest
@@ -61,6 +72,7 @@ import com.amazonaws.services.ec2.model.GroupIdentifier
 import com.amazonaws.services.ec2.model.Image
 import com.amazonaws.services.ec2.model.Instance
 import com.amazonaws.services.ec2.model.InstanceStateChange
+import com.amazonaws.services.ec2.model.InstanceStatus
 import com.amazonaws.services.ec2.model.IpPermission
 import com.amazonaws.services.ec2.model.KeyPairInfo
 import com.amazonaws.services.ec2.model.ModifyImageAttributeRequest
@@ -77,6 +89,7 @@ import com.amazonaws.services.ec2.model.SecurityGroup
 import com.amazonaws.services.ec2.model.Snapshot
 import com.amazonaws.services.ec2.model.SpotInstanceRequest
 import com.amazonaws.services.ec2.model.Subnet
+import com.amazonaws.services.ec2.model.SummaryStatus
 import com.amazonaws.services.ec2.model.Tag
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest
 import com.amazonaws.services.ec2.model.TerminateInstancesResult
@@ -91,12 +104,6 @@ import com.netflix.asgard.cache.CacheInitializer
 import com.netflix.asgard.model.SecurityGroupOption
 import com.netflix.asgard.model.Subnets
 import com.netflix.asgard.model.ZoneAvailability
-import groovyx.gpars.GParsExecutorsPool
-import java.util.regex.Matcher
-import java.util.regex.Pattern
-import org.apache.commons.codec.binary.Base64
-import org.codehaus.groovy.runtime.StackTraceUtils
-import org.springframework.beans.factory.InitializingBean
 
 class AwsEc2Service implements CacheInitializer, InitializingBean {
 
@@ -1174,5 +1181,19 @@ class AwsEc2Service implements CacheInitializer, InitializingBean {
         }
         preselectedAvailabilityZones*.zoneName
     }
+
+	boolean allInstanceHealthy(UserContext userContext, Collection<String> instanceIds){
+		def healthy = false
+		DescribeInstanceStatusRequest req = new DescribeInstanceStatusRequest().withInstanceIds(instanceIds)
+		DescribeInstanceStatusResult result = awsClient.by(userContext.region).describeInstanceStatus(req)
+		for(InstanceStatus instanceStatus : result.instanceStatuses){
+			healthy = 	instanceStatus.systemStatus.status == SummaryStatus.Ok.toString() &&
+						instanceStatus.instanceStatus.status == SummaryStatus.Ok.toString()
+			if(!healthy){
+				break
+			}
+		}
+		return healthy
+	}
 }
 
